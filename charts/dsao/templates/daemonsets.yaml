@@ -1,0 +1,76 @@
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  name: ds-agent
+  namespace: openshift
+spec:
+  selector:
+    matchLabels:
+      app: ds-agent
+  template:
+    metadata:
+      labels:
+        app: ds-agent
+    spec:
+      containers:
+      - name: ds-agent
+        image: >-
+          {{ .Values.image }}
+        securityContext:
+          privileged: true
+          runAsUser: 0
+        volumeMounts:
+        - mountPath: /sys
+          name: sys
+        - mountPath: /var/lib/crio/crio.sock
+          name: criosock
+          subPath: crio.sock
+          readOnly: true
+        - mountPath: /var/lib/crio/version
+          name: crioversion
+          readOnly: true
+        lifecycle:
+          postStart:
+            exec:
+              command:
+              - /bin/bash
+              - -c
+              - |
+                mkdir /var/run/crio
+                ln -s /var/lib/crio/crio.sock /var/run/crio/crio.sock
+                sleep 30s
+                /opt/ds_agent/dsa_control -t 15 -r
+                /opt/ds_agent/dsa_control -t 15 -a {{ .Values.dsmUrl }}
+          preStop:
+            exec:
+              command:
+              - /bin/bash
+              - -c
+              - systemctl stop ds_agent
+        readinessProbe:
+          exec:
+            command:
+            - /opt/ds_agent/dsa_query
+            - -c
+            - GetAgentStatus
+        livenessProbe:
+          exec:
+            command:
+            - /opt/ds_agent/dsa_query
+            - -c
+            - GetAgentStatus
+          initialDelaySeconds: 600
+          periodSeconds: 300
+      volumes:
+      - name: sys
+        hostPath:
+          path: /sys
+      - name: criosock
+        hostPath:
+          path: /var/run/crio
+      - name: crioversion
+        hostPath:
+          path: /var/lib/crio/version
+      serviceAccount: dsa-service-account
+      tolerations:
+      - operator: Exists
