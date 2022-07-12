@@ -16,6 +16,11 @@ spec:
       - name: ds-agent
         image: >-
           {{ .Values.image }}
+        resources:
+          requests:
+            memory: "512Mi"
+          limits:
+            memory: "2Gi"
         securityContext:
           privileged: true
           runAsUser: 0
@@ -29,6 +34,9 @@ spec:
         - mountPath: /var/lib/crio/version
           name: crioversion
           readOnly: true
+        - mountPath: /host/etc/os-release
+          name: osrelease
+          readOnly: true
         lifecycle:
           postStart:
             exec:
@@ -40,27 +48,48 @@ spec:
                 ln -s /var/lib/crio/crio.sock /var/run/crio/crio.sock
                 sleep 30s
                 /opt/ds_agent/dsa_control -t 15 -r
-                /opt/ds_agent/dsa_control -t 15 -a {{ .Values.dsmUrl }}
+                {{ if .Values.dsmProxy }}
+                /opt/ds_agent/dsa_control -x {{ .Values.dsmProxy }}
+                {{ end }}
+                {{ if .Values.proxyCredential }}
+                /opt/ds_agent/dsa_control -u {{ .Values.proxyCredential }}
+                {{ end }}
+                {{ if .Values.relayProxy }}
+                /opt/ds_agent/dsa_control -y {{ .Values.relayProxy }}
+                {{ end }}
+                {{ if .Values.relayProxyCredential }}
+                /opt/ds_agent/dsa_control -w {{ .Values.relayProxyCredential }}
+                {{ end }}
+                /opt/ds_agent/dsa_control -t 15 -a {{ .Values.dsmUrl }} "hostname:$TM_DS_DSAO_HN"
           preStop:
             exec:
               command:
               - /bin/bash
               - -c
               - systemctl stop ds_agent
-        readinessProbe:
+        startupProbe:
           exec:
             command:
             - /opt/ds_agent/dsa_query
             - -c
             - GetAgentStatus
+          periodSeconds: 60
+          timeoutSeconds: 60
         livenessProbe:
           exec:
             command:
             - /opt/ds_agent/dsa_query
             - -c
             - GetAgentStatus
-          initialDelaySeconds: 600
-          periodSeconds: 300
+          periodSeconds: 3600
+          timeoutSeconds: 60
+          successThreshold: 1
+          failureThreshold: 24
+        env:
+          - name: TM_DS_DSAO_HN
+            valueFrom:
+              fieldRef:
+                fieldPath: spec.nodeName
       volumes:
       - name: sys
         hostPath:
@@ -71,6 +100,9 @@ spec:
       - name: crioversion
         hostPath:
           path: /var/lib/crio/version
+      - name: osrelease
+        hostPath:
+          path: /etc/os-release
       serviceAccount: dsa-service-account
       tolerations:
       - operator: Exists
