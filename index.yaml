@@ -2,6 +2,16 @@ apiVersion: v1
 entries:
   ds-agent:
   - apiVersion: v2
+    appVersion: 20.0.0-5137
+    created: "2022-07-18T07:39:07.510986461Z"
+    description: A Helm chart for Deep Security Agent in OpenShift
+    digest: 1094c284d14b4d2d5548cebb4a4018c5926054ddc8337b1beedd73abef8fc0f5
+    name: ds-agent
+    type: application
+    urls:
+    - https://github.com/trendmicro/dsao/releases/download/ds-agent-1.0.0/ds-agent-1.0.0.tgz
+    version: 1.0.0
+  - apiVersion: v2
     appVersion: 20.0.0-5064
     created: "2022-07-12T13:14:26.972884695Z"
     description: A Helm chart for Deep Security Agent in OpenShift
@@ -21,4 +31,4 @@ entries:
     urls:
     - https://github.com/trendmicro/dsao/releases/download/ds-agent-0.1.0/ds-agent-0.1.0.tgz
     version: 0.1.0
-generated: "2022-07-12T13:14:26.972925895Z"
+generated: "2022-07-18T07:39:07.510996261Z"
