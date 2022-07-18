@@ -2,5 +2,5 @@ apiVersion: v2
 name: ds-agent
 description: A Helm chart for Deep Security Agent in OpenShift
 type: application
-version: 0.1.1
-appVersion: "20.0.0-5064"
+version: 1.0.0
+appVersion: "20.0.0-5137"
