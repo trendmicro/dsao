@@ -11,11 +11,14 @@ spec:
     metadata:
       labels:
         app: ds-agent
+      annotations:
+        checksum/activation: {{ include (print $.Template.BasePath "/secret.yaml") . | sha256sum }}
     spec:
       containers:
       - name: ds-agent
         image: >-
           {{ .Values.image }}
+        imagePullPolicy: IfNotPresent
         resources:
           requests:
             memory: "512Mi"
@@ -38,6 +41,9 @@ spec:
         - mountPath: /host/etc/os-release
           name: osrelease
           readOnly: true
+        - mountPath: /etc/ds-activation
+          name: activation
+          readOnly: true
         lifecycle:
           postStart:
             exec:
@@ -50,19 +56,39 @@ spec:
                 ln -v -s /var/lib/crio/crio.sock /var/run/crio/crio.sock
                 sleep 30s
                 /opt/ds_agent/dsa_control -t 15 -r
-                {{ if .Values.dsmProxy }}
-                /opt/ds_agent/dsa_control -x {{ .Values.dsmProxy }}
-                {{ end }}
-                {{ if .Values.proxyCredential }}
-                /opt/ds_agent/dsa_control -u {{ .Values.proxyCredential }}
-                {{ end }}
-                {{ if .Values.relayProxy }}
-                /opt/ds_agent/dsa_control -y {{ .Values.relayProxy }}
-                {{ end }}
-                {{ if .Values.relayProxyCredential }}
-                /opt/ds_agent/dsa_control -w {{ .Values.relayProxyCredential }}
-                {{ end }}
-                /opt/ds_agent/dsa_control -t 15 -a {{ .Values.dsmUrl }} "hostname:$TM_DS_DSAO_HN"
+                # Activation settings come from the ds-agent-activation Secret.
+                # Values are only ever passed as quoted arguments, never
+                # evaluated as shell code, and never echoed to the log.
+                act=/etc/ds-activation
+                if [ -s "$act/dsmProxy" ]; then
+                  /opt/ds_agent/dsa_control -x "$(cat "$act/dsmProxy")"
+                fi
+                if [ -s "$act/proxyCredential" ]; then
+                  /opt/ds_agent/dsa_control -u "$(cat "$act/proxyCredential")"
+                fi
+                if [ -s "$act/relayProxy" ]; then
+                  /opt/ds_agent/dsa_control -y "$(cat "$act/relayProxy")"
+                fi
+                if [ -s "$act/relayProxyCredential" ]; then
+                  /opt/ds_agent/dsa_control -w "$(cat "$act/relayProxyCredential")"
+                fi
+                if [ ! -s "$act/dsmUrl" ]; then
+                  echo "dsmUrl is missing from the ds-agent-activation Secret"
+                  exit 1
+                fi
+                # dsmUrl is the activation URL optionally followed by
+                # space-separated, double-quoted "key:value" items, e.g.
+                #   dsm://host:443/ "token:..." "policyid:1"
+                # Split on whitespace (read does no glob or command
+                # expansion) and strip one pair of surrounding quotes.
+                read -r -a items < "$act/dsmUrl"
+                args=()
+                for item in "${items[@]}"; do
+                  item="${item#\"}"
+                  item="${item%\"}"
+                  args+=("$item")
+                done
+                /opt/ds_agent/dsa_control -t 15 -a "${args[@]}" "hostname:$TM_DS_DSAO_HN"
           preStop:
             exec:
               command:
@@ -102,6 +128,10 @@ spec:
       - name: osrelease
         hostPath:
           path: /etc/os-release
+      - name: activation
+        secret:
+          secretName: ds-agent-activation
+          defaultMode: 0400
       serviceAccount: dsa-service-account
       tolerations:
       - operator: Exists

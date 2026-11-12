@@ -1,1 +1,6 @@
-image: public.ecr.aws/trendmicro/dsao:20.0.3-14910
+image: public.ecr.aws/trendmicro/dsao:20.0.3-14910@sha256:67b6493ff7568a13e6bb8805434df214355f7d1973e8dabb9b5a5cabe4cf86c1
+dsmUrl: ""
+dsmProxy: ""
+proxyCredential: ""
+relayProxy: ""
+relayProxyCredential: ""

@@ -30,6 +30,16 @@ helm install ds-agent ds-agent/ds-agent \
 
 Replace `<your-dsm-url>` with the URL of your Deep Security Manager (for example, `https://dsm.example.com:4119`).
 
+Activation settings (`dsmUrl`, `dsmProxy`, `proxyCredential`, `relayProxy`, `relayProxyCredential`) are stored by the chart in the `ds-agent-activation` Secret and are not exposed in the DaemonSet or Pod spec.
+
+## Upgrading the Agent Version
+
+`values.yaml` pins the image by tag **and** digest. When bumping the agent version, update both the tag and the `@sha256:` digest (the digest of the multi-arch image index), and bump `version`/`appVersion` in `Chart.yaml`. To look up the digest:
+
+```bash
+docker buildx imagetools inspect public.ecr.aws/trendmicro/dsao:<tag>   # "Digest:" line
+```
+
 ## Useful Commands
 
 ```bash
